@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  turbopack: {}, // 必须加上
   webpack(config, { isServer }) {
     // 忽略 thread-stream/test 文件
     if (!isServer) {
