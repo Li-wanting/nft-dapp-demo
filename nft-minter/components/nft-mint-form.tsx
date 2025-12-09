@@ -26,6 +26,7 @@ import { useAccount } from "wagmi";
 import { useNFTMint } from "@/app/hooks/useNFTMint";
 import { explorers } from "@/lib/contract";
 import { useMintEstimateGas } from "@/app/hooks/useMintEstimateGas";
+import { Switch } from "./ui/switch";
 
 // Mint 步骤枚举映射
 const MINT_STEP = {
@@ -35,6 +36,7 @@ const MINT_STEP = {
   confirming: "confirming", // 用户确认交易中
   success: "success", // 交易成功
   error: "error", // 交易失败
+  imgToIpfsUploading: 'uploading-img-to-ipfs', // 图片文件上传到ipfs中
 };
 
 // Mint 步骤提示信息枚举映射
@@ -42,11 +44,13 @@ const MINT_STEP_MSG = {
   [MINT_STEP.confirming]: "Waiting for confirmation...",
   [MINT_STEP.metadataUploading]: "Uploading metadata to IPFS...",
   [MINT_STEP.minting]: "Submitting transaction...",
+  [MINT_STEP.imgToIpfsUploading]: "Uploading image file to IPFS...",
 };
 
 export function NftMintForm() {
   const [formData, setFormData] = useState({
     imageUrl: "",
+    isUploadImg: 0,
     name: "",
     description: ""
   })
@@ -86,6 +90,7 @@ export function NftMintForm() {
     if (!isConnected) {
       setFormData({
         imageUrl: "",
+        isUploadImg: 0,
         name: "",
         description: "",
       });
@@ -101,6 +106,47 @@ export function NftMintForm() {
       [name]: value
     }))
   }
+
+  // 切换模式：是否使用本地上传图片
+  const onSwitch = (value: boolean) => {
+    setFormData((pre) => ({
+      ...pre,
+      isUploadImg: value ? 1 : 0,
+      imageUrl: "",
+    }));
+  };
+
+  // 上传文件操作
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    console.log("上传文件：", file);
+    if (!file) return;
+    setFormData((pre)=>({
+      ...pre,
+      imageUrl: "",
+      imageFile: file,
+    }))
+
+    // 上传文件到 Pinata
+    const form = new FormData();
+    form.append("file", file);
+
+    setMintStep(MINT_STEP.imgToIpfsUploading);
+
+    const res = await fetch("/api/pinata/pinFileToIPFS", {
+      method: "POST",
+      body: form,
+    });
+    const { success, data } = await res.json();
+    if (success) {
+      console.log("文件托管地址：", data);
+      setFormData((prev) => ({
+        ...prev,
+        imageUrl: data.ipfsUrl,
+      }));
+    }
+    setMintStep(MINT_STEP.idle);
+  };
 
   // 上传元数据到IPFS
   const uploadMetadata = async (): Promise<string> => {
@@ -140,6 +186,8 @@ export function NftMintForm() {
 
   // 监听交易步骤变化
   const mintStepMemo = useMemo(() => {
+    if (mintStep === MINT_STEP.imgToIpfsUploading)
+      return MINT_STEP.imgToIpfsUploading;
     if (mintStep === MINT_STEP.metadataUploading)
       return MINT_STEP.metadataUploading;
     if (isWriting) return MINT_STEP.minting;
@@ -178,6 +226,7 @@ export function NftMintForm() {
         MINT_STEP.metadataUploading,
         MINT_STEP.minting,
         MINT_STEP.confirming,
+        MINT_STEP.imgToIpfsUploading,
       ].includes(mintStepMemo),
     [mintStepMemo]
   );
@@ -307,6 +356,38 @@ export function NftMintForm() {
           </div>
         )}
 
+        <div className="space-y-2">
+          <Label htmlFor="imageUrl" className="flex items-center gap-2">
+            <ImageIcon className="h-4 w-4 text-purple-600" />
+            Upload Image Mode
+          </Label>
+          <Switch
+            value={formData.isUploadImg}
+            defaultChecked={false}
+            onCheckedChange={onSwitch}
+            disabled={isMinting}
+            className="border-purple-100 data-[state=checked]:border-purple-900 data-[state=checked]:bg-purple-900 dark:border-purple-900 dark:data-[state=checked]:border-purple-900 dark:data-[state=checked]:bg-purple-900"
+          />
+        </div>
+
+        {/* Image File Upload*/}
+        {!!formData.isUploadImg ? (
+          <div className="space-y-2">
+            <Label htmlFor="imageUrl" className="flex items-center gap-2">
+              <ImageIcon className="h-4 w-4 text-purple-600" />
+              Upload Image File
+            </Label>
+            <Input
+              id="picture"
+              type="file"
+              name="imageFile"
+              onChange={handleUploadFile}
+              disabled={isMinting}
+              accept="image/*"
+            />
+          </div>
+        ) : null}
+
         {/* Image URL Input */}
         <div className="space-y-2">
           <Label htmlFor="imageUrl" className="flex items-center gap-2">
@@ -320,7 +401,7 @@ export function NftMintForm() {
             placeholder="https://example.com/your-nft-image.png"
             value={formData.imageUrl}
             onChange={handleInputChange}
-            disabled={isMinting}
+            disabled={isMinting || !!formData.isUploadImg}
           />
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Enter the URL of your NFT image (IPFS, Arweave, or HTTP)
