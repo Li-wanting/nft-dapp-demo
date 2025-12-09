@@ -107,7 +107,7 @@ export function NftMintForm() {
     const metadata = createNFTMetadata(
       formData.name,
       formData.description,
-      formData.imageUrl
+      imgUrlObj.ipfsImgUrl, //这里img要ipfs协议格式的
     );
     const res = await fetch("/api/pinata/pinJSONToIPFS", {
       method: "POST",
@@ -188,14 +188,25 @@ export function NftMintForm() {
     [formData]
   );
 
-  // 图片预览的url，如果是ipfs协议格式的url需要转换成浏览器可访问的格式
-  const imgPreviewUrl = useMemo(() => {
+  // 从图片链接解析出url的两种格式，ipfsImgUrl用于metadata update，gatewayImgUrl用于前端预览图片
+  const imgUrlObj = useMemo(() => {
     const url = formData.imageUrl;
+    let ipfsImgUrl = "",
+      gatewayImgUrl = "";
     if (url.startsWith("ipfs://")) {
       const hash = url.replace("ipfs://", "");
-      return `https://ipfs.io/ipfs/${hash}`;
+      ipfsImgUrl = url;
+      gatewayImgUrl = `https://ipfs.io/ipfs/${hash}`;
     }
-    return url;
+    if (url.startsWith("https://") && url.includes("ipfs")) {
+      const hash = url.split("/").pop();
+      ipfsImgUrl = `ipfs://${hash}`;
+      gatewayImgUrl = url;
+    }
+    return {
+      ipfsImgUrl,
+      gatewayImgUrl,
+    };
   }, [formData.imageUrl]);
 
   // 获取区块浏览器链接
@@ -317,11 +328,11 @@ export function NftMintForm() {
         </div>
 
         {/* Image Preview */}
-        {imgPreviewUrl && (
+        {imgUrlObj.gatewayImgUrl && (
           <div className="rounded-lg border-2 border-purple-100 dark:border-purple-900 overflow-hidden bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950 p-4">
             <div className="aspect-square w-full max-w-xs mx-auto rounded-lg overflow-hidden bg-white dark:bg-zinc-900 shadow-lg">
               <img
-                src={imgPreviewUrl}
+                src={imgUrlObj.gatewayImgUrl}
                 alt="NFT Preview"
                 className="w-full h-full object-cover"
                 onError={(e) => {
