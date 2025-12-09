@@ -22,6 +22,11 @@ root
 
 可以随时对比 initial.zip 中的代码与此完整版本，了解每一步如何实现。
 
+## 环境要求
+- Node.js ≥ 18
+- npm 或 pnpm
+- MetaMask 浏览器钱包
+
 
 ## ✏️ 教程文档
 🔗notion链接：https://www.notion.so/NFT-DApp-demo-2b99aba053cf801689a2fad427fdacb3?v=25f9aba053cf80bf9a5e000c31eabfb1&source=copy_link
